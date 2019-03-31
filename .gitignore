@@ -1,5 +1,6 @@
 node_modules/
 .vscode/
-**/*.js
+dist/*.js
 **/*.js.map
 !build/build.js
+.idea

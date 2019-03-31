@@ -1,6 +1,9 @@
+import {ColorKeyboard} from "./ColorKeyboard";
+import * as p5 from "p5";
+
 var sketch = (p: p5) => {
 
-    const morph = new Morph();
+    const colorKeyboard: ColorKeyboard = new ColorKeyboard();
 
     p.preload = () => {
 
@@ -8,7 +11,7 @@ var sketch = (p: p5) => {
     
     p.setup = () => {
         p.createCanvas(p.windowWidth, p.windowHeight);
-        morph.setup(p);
+        colorKeyboard.setup(p);
     }
 
     p.windowResized = () => {
@@ -17,7 +20,7 @@ var sketch = (p: p5) => {
 
     p.draw = () => {
         p.background(100);
-        morph.draw(p);
+        colorKeyboard.draw(p);
     }
 }
 
