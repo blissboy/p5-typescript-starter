@@ -22,11 +22,22 @@ interface DrawContext {
     position: p5.Vector
 }
 
+interface Flake {
+    sections: number,               // each flake is symetrical, how many sections shall we divide a circle into?
+    divisionsPerSection: number,    // per section, how many points?
+    centerDeltas: number[],         // from the center, what are the deltas for the points in the "reference" section
+    draw: (number) => void,         // drawing function, argument is framenumber. This method should also update melted
+    melted: boolean,                // true if the flake has reached its end
+}
+
 export class ColorKeyboard {
 
     private midi: MIDIAccess = require('webmidi');
+    private flakes: Flake[] = [];
     private windowCenterX: number = window.innerWidth / 2;
     private windowCenterY: number = window.innerHeight / 2;
+    private frameNumber: number = 0;
+
 
     private p: p5;
 
@@ -37,15 +48,33 @@ export class ColorKeyboard {
 
     setup(p: p5): void {
         this.p = p;
+
+        colorMode(HSB, 360, width, height);
+        background(360, 0, height);
+
+
         this.initMidi();
     }
 
     draw(p: p5): void {
+
+        this.drawFlakes();
         p.stroke(127,127,127);
         p.rect(0,0,200,200);
         //console.log('frots');
 
     }
+
+    drawFlakes() {
+        this.flakes.forEach((flake) => {
+
+        });
+    }
+
+    private createFlake(Note: any) {
+        return undefined;
+    }
+
 
     private initMidi() : void {
         console.log('initializing midi');
@@ -81,7 +110,10 @@ export class ColorKeyboard {
         // TODO: this needs to write a plane geom as in https://github.com/mrdoob/three.js/blob/master/examples/webgl_geometry_colors.html
         // https://threejs.org/examples/#webgl_geometry_colors
 
-        this.drawFlakeSphere(midiEvent.note, this.p.createVector(0,0));
+
+        this.flakes.push(createFlake(midiEvent.Note));
+
+        // this.drawFlakeSphere(midiEvent.note, this.p.createVector(0,0));
 
         //createSphere(scene, midiEvent.note, noteTexture);
     }
@@ -90,7 +122,7 @@ export class ColorKeyboard {
         console.log(`midiEvent: ${JSON.stringify(midiEvent, null, "  ")}`);
     }
 
-    private drawFlakeSphere: (Note, DrawContext)=>void = (note: Note, context: DrawContext)=> {
+    private drawFlakeSphere: (Note, Flake, DrawContext)=>void = (note: Note, flake: Flake, context: DrawContext)=> {
 
     }
 
