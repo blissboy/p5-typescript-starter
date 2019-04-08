@@ -1,4 +1,3 @@
-
 import MIDIMessageEvent = WebMidi.MIDIMessageEvent;
 import {WebMidi} from "WebMidi"
 import * as random from "seedrandom";
@@ -18,6 +17,19 @@ interface Note {
     octave: number
 }
 
+
+interface SnowFlake {
+    context: FlakeContext,
+    flakePoints: p5.Vector[]
+}
+
+interface FlakeContext {
+    position: (frame: number) => p5.Vector,
+    orientation: (frame: number) => number,
+    melted: (frame: number) => boolean
+}
+
+
 interface DrawContext {
     position: p5.Vector
 }
@@ -26,16 +38,25 @@ interface Flake {
     sections: number,               // each flake is symetrical, how many sections shall we divide a circle into?
     divisionsPerSection: number,    // per section, how many points?
     centerDeltas: number[],         // from the center, what are the deltas for the points in the "reference" section
-    draw: (number) => void,         // drawing function, argument is framenumber. This method should also update melted
+    draw: (number, Flake) => void,         // drawing function, argument is framenumber. This method should also update melted
+    uniqueness: FlakePersonalization,
     melted: boolean,                // true if the flake has reached its end
+}
+
+interface FlakePersonalization {
+    startingLocation: p5.Vector
 }
 
 export class ColorKeyboard {
 
     private midi: MIDIAccess = require('webmidi');
-    private flakes: Flake[] = [];
+    private flakes: SnowFlake[] = [];
     private windowCenterX: number = window.innerWidth / 2;
     private windowCenterY: number = window.innerHeight / 2;
+    private octaveSize: number = this.windowCenterX;
+    private noteSize: number = this.octaveSize / 6;
+    private middleCOctave: number = 4;
+
     private frameNumber: number = 0;
 
 
@@ -49,8 +70,8 @@ export class ColorKeyboard {
     setup(p: p5): void {
         this.p = p;
 
-        colorMode(HSB, 360, width, height);
-        background(360, 0, height);
+        p.colorMode(p.HSB, 360, p.width, p.height);
+        p.background(360, 0, p.height);
 
 
         this.initMidi();
@@ -58,25 +79,148 @@ export class ColorKeyboard {
 
     draw(p: p5): void {
 
-        this.drawFlakes();
-        p.stroke(127,127,127);
-        p.rect(0,0,200,200);
+        this.frameNumber++;
+        this.drawFlakes(this.flakes);
+        this.flakes = this.flakes.filter(flake => !flake.context.melted(this.frameNumber));
+        // p.stroke(127, 127, 127);
+        // p.rect(0, 0, 200, 200);
         //console.log('frots');
 
     }
 
-    drawFlakes() {
+    drawFlakes(flakes: SnowFlake[]) {
         this.flakes.forEach((flake) => {
-
+            this.drawFlake(flake);
         });
     }
 
-    private createFlake(Note: any) {
-        return undefined;
+    private drawFlake(flake: SnowFlake): void {
+        this.p.push();
+        this.p.translate(flake.context.position(this.frameNumber));
+
+        this.p.beginShape(this.p.TRIANGLE_FAN);
+        this.p.vertex(0, 0);
+        flake.flakePoints.forEach((point) => {
+            this.p.vertex(point.x, point.y);
+            this.p.fill(100, this.p.mouseX, this.p.mouseY);
+            this.p.endShape();
+        });
+        // for (let angle = 0; angle <= 360; angle += angleStep) {
+        //     this.p.vertex(width / 2 + cos(radians(angle)) * radius, height / 2 + sin(radians(angle)) * radius);
+        //     fill(angle, mouseX, mouseY);
+        //
+        //     endShape();
+        // }
+        this.p.pop();
+
     }
 
 
-    private initMidi() : void {
+    private createSnowFlake(note: Note): SnowFlake {
+
+        const currentFrame: number = this.frameNumber;
+        const framesToLive = 200;
+
+        let positionFn: (number) => p5.Vector = (frame: number) => {
+            let location: p5.Vector = new p5.Vector();
+            location.x = this.getPositionOffsetForNote(note);
+            location.y = 300 + frame - currentFrame;
+            return location;
+        }
+
+        let orientationFn: (number) => number = (frame: number) => {
+            return 0;
+        }
+
+        let meltedFn: (number) => boolean = (frame: number) => {
+            //console.log(`frame:${frame} currentFrame:${currentFrame} framesToLive:${framesToLive}`);
+
+            return (frame > currentFrame + framesToLive);
+        }
+
+        let context: FlakeContext = {
+            position: positionFn,
+            orientation: orientationFn,
+            melted: meltedFn
+        };
+
+        return {
+            context: context,
+            flakePoints: this.generateNewSnowflakePoints(6, 4, 300)
+        };
+    }
+
+
+    private generateNewSnowflakePoints(numSectors: number, pointsPerSector: number, maxSize: number): p5.Vector[] {
+        const alpha: number = 2 * Math.PI / numSectors;
+        const totalFlakePoints: number = (pointsPerSector - 1) * numSectors;
+
+        const flakePoints: p5.Vector[] = new Array(totalFlakePoints);
+        const randomVals: number[] = new Array(pointsPerSector - 1);
+        for (let i = 0; i < pointsPerSector - 1; i++) {
+            randomVals[i] = _.random(1.0, true)
+        }
+
+
+        for (let i: number = 0; i <= totalFlakePoints; i++) {
+            flakePoints[i] =
+                this.newP5Vector(
+                    Math.cos(i * alpha / (pointsPerSector - 1)),
+                    Math.sin(i * alpha / (pointsPerSector - 1))
+                ).setMag(maxSize * randomVals[i % randomVals.length]);
+        }
+
+        //
+        console.log('Flake points:\n');
+        flakePoints.forEach(point => console.log(`\tx:${point.x}, y:${point.y}`));
+
+
+        return flakePoints;
+    }
+
+
+    // private createFlake(note: Note) {
+    //     let location: p5.Vector = new p5.Vector();
+    //     location.x = this.getPositionOffsetForNote(note);
+    //     location.y = 300;
+    //
+    //     const flakeUnique: FlakePersonalization = {
+    //         startingLocation: location
+    //     }
+    //
+    //     const flake: Flake = {
+    //         sections: 6,
+    //         divisionsPerSection: 4,
+    //         centerDeltas: [],
+    //         draw: this.flakeDrawer,
+    //         uniqueness: flakeUnique,
+    //         melted: false
+    //     }
+    //
+    //     return flake;
+    // }
+
+    // private flakeDrawerFactory: (initContext: any) => (frame: number, p: p5) => void = (initContext: any) => {
+    //
+    //
+    //
+    //
+    //     return (frame: number, p: p5) => {
+    //         this.p.beginShape(TRIANGLE_FAN);
+    //         this.p.vertex(width / 2, height / 2);
+    //
+    //         for (let angle = 0; angle <= 360; angle += angleStep) {
+    //             this.p.vertex(width / 2 + cos(radians(angle)) * radius, height / 2 + sin(radians(angle)) * radius);
+    //             fill(angle, mouseX, mouseY);
+    //
+    //             endShape();
+    //         }
+    //     }
+    //
+    // }
+    //
+
+    private initMidi: () => void = () => {
         console.log('initializing midi');
 
         if (navigator.requestMIDIAccess) {
@@ -85,14 +229,19 @@ export class ColorKeyboard {
             console.log('WebMIDI is not supported in this browser.');
         }
 
+
+        // @ts-ignore this totally exists
         this.midi.enable((err: any) => {
             if (!err) {
                 console.log("enabled midi");
                 console.log(`inputs: ${this.midi.inputs}`);
                 this.midi.inputs.forEach(input => console.log(`Found midi input ${input.name}`));
                 this.midi.inputs.forEach(input => {
+                    // @ts-ignore this totally exists
                     input.addListener('noteon', 'all', this.noteOnHandler);
+                    // @ts-ignore this totally exists
                     input.addListener('pitchbend', 'all', this.midiHandler);
+                    // @ts-ignore this totally exists
                     input.addListener('controlchange', 'all', this.midiHandler);
                 });
                 console.log(`outputs: ${this.midi.outputs}`)
@@ -104,14 +253,15 @@ export class ColorKeyboard {
         console.log('completed initializing midi');
     }
 
-    private noteOnHandler: (MIDIMessageEvent)=>void = (midiEvent: MIDIMessageEvent): void => {
+    private noteOnHandler: (MIDIMessageEvent) => void = (midiEvent: MIDIMessageEvent): void => {
 
         console.log(`handling ${JSON.stringify(midiEvent)}`);
         // TODO: this needs to write a plane geom as in https://github.com/mrdoob/three.js/blob/master/examples/webgl_geometry_colors.html
         // https://threejs.org/examples/#webgl_geometry_colors
 
 
-        this.flakes.push(createFlake(midiEvent.Note));
+        // @ts-ignore this totally exists
+        this.flakes.push(this.createSnowFlake(midiEvent.note));
 
         // this.drawFlakeSphere(midiEvent.note, this.p.createVector(0,0));
 
@@ -122,10 +272,47 @@ export class ColorKeyboard {
         console.log(`midiEvent: ${JSON.stringify(midiEvent, null, "  ")}`);
     }
 
-    private drawFlakeSphere: (Note, Flake, DrawContext)=>void = (note: Note, flake: Flake, context: DrawContext)=> {
+    private drawFlakeSphere: (Note, Flake, DrawContext) => void = (note: Note, flake: Flake, context: DrawContext) => {
 
     }
 
+    private getPositionOffsetForNote: (Note) => number = (note: Note) => {
+        switch (note.name) {
+            case 'C':
+                return this.octaveSize * (note.octave - this.middleCOctave) + 0 * this.noteSize;
+            case 'C#':
+                return this.octaveSize * (note.octave - this.middleCOctave) + 1 * this.noteSize;
+            case 'D':
+                return this.octaveSize * (note.octave - this.middleCOctave) + 2 * this.noteSize;
+            case 'D#':
+                return this.octaveSize * (note.octave - this.middleCOctave) + 3 * this.noteSize;
+            case 'E':
+                return this.octaveSize * (note.octave - this.middleCOctave) + 4 * this.noteSize;
+            case 'F':
+                return this.octaveSize * (note.octave - this.middleCOctave) + 5 * this.noteSize;
+            case 'F#':
+                return this.octaveSize * (note.octave - this.middleCOctave) + 6 * this.noteSize;
+            case 'G':
+                return this.octaveSize * (note.octave - this.middleCOctave) + 7 * this.noteSize;
+            case 'G#':
+                return this.octaveSize * (note.octave - this.middleCOctave) + 8 * this.noteSize;
+            case 'A':
+                return this.octaveSize * (note.octave - this.middleCOctave) + 9 * this.noteSize;
+            case 'A#':
+                return this.octaveSize * (note.octave - this.middleCOctave) + 10 * this.noteSize;
+            case 'B':
+                return this.octaveSize * (note.octave - this.middleCOctave) + 11 * this.noteSize;
+            default:
+                return 0;
+        }
+    }
+
+    private newP5Vector(x: number, y: number): p5.Vector {
+        const vec: p5.Vector = new p5.Vector();
+        vec.x = x;
+        vec.y = y;
+        return vec;
+    }
 
 
     // private createFlakeSphere: (Note,p5.material.texture  Texture)=>void = (scene: Scene, note: Note, materialTexture: Texture): void => {
