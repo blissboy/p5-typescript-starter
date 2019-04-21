@@ -90,7 +90,8 @@ export class ColorKeyboard {
 
     drawFlakes(flakes: SnowFlake[]) {
         this.flakes.forEach((flake) => {
-            this.drawFlake(flake);
+            //this.drawFlake(flake);
+            this.drawFlakeGeneKogan(flake);
         });
     }
 
@@ -113,6 +114,38 @@ export class ColorKeyboard {
         // }
         this.p.pop();
 
+    }
+
+
+    private drawFlakeGeneKogan(flake: SnowFlake) {
+        //background(240);
+
+        const ang1 = this.p.TWO_PI * this.p.noise(0.01 * this.p.frameCount + 10);
+        const ang2 = this.p.TWO_PI * this.p.noise(0.01 * this.p.frameCount + 20);
+        const ang3 = this.p.TWO_PI * this.p.noise(0.01 * this.p.frameCount + 30);
+        const rx = 60 * this.p.noise(0.01 * this.p.frameCount + 40);
+        const tx = 200 * this.p.noise(0.01 * this.p.frameCount + 50);
+        const size1 = 200 * this.p.noise(0.01 * this.p.frameCount + 60);
+        const size2 = 50 * this.p.noise(0.01 * this.p.frameCount + 60);
+
+        this.p.translate(flake.context.position(this.frameNumber));
+        // translate(width / 2, height / 2);
+        for (let i = 0; i < 17; i++) {
+            this.p.push();
+            this.p.rotate(ang1 + this.p.TWO_PI * i / 17);
+            this.p.translate(tx, 0);
+            this.p.rect(0, 0, size1, size1);
+            for (let j = 0; j < 16; j++) {
+                this.p.push();
+                this.p.rotate(ang2 + this.p.TWO_PI * j / 16);
+                this.p.translate(rx, 0);
+                this.p.rotate(ang3);
+                this.p.rect(rx, 0, size2, size2);
+                this.p.pop();
+            }
+            //this.p.translate();
+            this.p.pop();
+        }
     }
 
 
@@ -146,7 +179,7 @@ export class ColorKeyboard {
 
         return {
             context: context,
-            flakePoints: this.generateNewSnowflakePoints(6, 4, 300)
+            flakePoints: this.generateNewSnowflakePoints(3, 17, 300)
         };
     }
 
@@ -171,8 +204,8 @@ export class ColorKeyboard {
         }
 
         //
-        console.log('Flake points:\n');
-        flakePoints.forEach(point => console.log(`\tx:${point.x}, y:${point.y}`));
+        //console.log('Flake points:\n');
+        //flakePoints.forEach(point => console.log(`\tx:${point.x}, y:${point.y}`));
 
 
         return flakePoints;
